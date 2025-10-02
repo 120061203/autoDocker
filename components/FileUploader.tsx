@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Upload, File, X } from 'lucide-react'
+import { Upload, File, X, Trash2 } from 'lucide-react'
 
 interface FileUploaderProps {
   onFilesUploaded: (files: File[]) => void
@@ -32,6 +32,12 @@ export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
     const newFiles = files.filter((_, i) => i !== index)
     setFiles(newFiles)
     onFilesUploaded(newFiles)
+  }
+
+  const clearAllFiles = () => {
+    setFiles([])
+    setGithubUrl('')
+    onFilesUploaded([])
   }
 
   const handleGithubUrl = async () => {
@@ -156,7 +162,16 @@ export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
       {/* Uploaded Files */}
       {files.length > 0 && (
         <div className="space-y-2">
-          <h4 className="text-sm font-medium text-gray-700">已上傳的文件:</h4>
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium text-gray-700">已上傳的文件:</h4>
+            <button
+              onClick={clearAllFiles}
+              className="flex items-center space-x-1 px-3 py-1 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>清除全部</span>
+            </button>
+          </div>
           <div className="space-y-1">
             {files.map((file, index) => (
               <div

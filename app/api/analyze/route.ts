@@ -42,6 +42,129 @@ async function analyzeWithZbpack(files: File[], selectedLanguage?: string): Prom
   const { promisify } = require('util')
   const execAsync = promisify(exec)
   
+  // 首先手動檢測所有語言
+  const detectedLanguages = []
+  const fileNames = files.map(f => f.name.toLowerCase())
+  
+  // Node.js 項目檢測
+  if (fileNames.some(name => name.includes('package.json'))) {
+    detectedLanguages.push('nodejs')
+  }
+  
+  // Python 項目檢測
+  if (fileNames.some(name => name.includes('requirements.txt'))) {
+    detectedLanguages.push('python')
+  }
+  
+  // Go 項目檢測
+  if (fileNames.some(name => name.includes('go.mod'))) {
+    detectedLanguages.push('go')
+  }
+  
+  // Java 項目檢測
+  if (fileNames.some(name => name.includes('pom.xml'))) {
+    detectedLanguages.push('java')
+  }
+  
+  // Rust 項目檢測
+  if (fileNames.some(name => name.includes('cargo.toml'))) {
+    detectedLanguages.push('rust')
+  }
+  
+  console.log('檢測到的語言:', detectedLanguages)
+  
+  // 如果檢測到多種語言，為每個語言分別分析
+  if (detectedLanguages.length > 1) {
+    console.log('檢測到多種語言，將為每個語言分別分析:', detectedLanguages)
+    
+    // 為每個語言創建單獨的分析結果
+    const languageAnalysisResults = []
+    
+    for (const language of detectedLanguages) {
+      console.log(`開始分析 ${language} 語言...`)
+      
+      // 創建臨時目錄
+      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), `zbpack-${language}-`))
+      
+      try {
+        // 保存文件到臨時目錄
+        for (const file of files) {
+          const filePath = path.join(tempDir, file.name)
+          const buffer = Buffer.from(await file.arrayBuffer())
+          await fs.writeFile(filePath, buffer)
+        }
+        
+        console.log(`調用 zbpack 分析 ${language}:`, tempDir)
+        
+        // 調用 zbpack 分析
+        const { stdout, stderr } = await execAsync(`zbpack --info "${tempDir}"`)
+        
+        console.log(`zbpack 標準輸出 (${language}):`, stdout)
+        console.log(`zbpack 錯誤輸出 (${language}):`, stderr)
+        
+        // zbpack 的輸出可能在 stderr 中
+        const output = stdout || stderr || ''
+        
+             // 解析 zbpack 輸出並返回原始輸出
+             const parsedResult = parseZbpackOutput(output)
+             
+             // 如果解析結果的語言與預期不符，使用預期的語言
+             if (parsedResult.language !== language && language !== 'unknown') {
+               parsedResult.language = language
+               console.log(`修正語言從 ${parsedResult.language} 到 ${language}`)
+             }
+             
+             const analysisResult = {
+               ...parsedResult,
+               detectedLanguages: [language],
+               rawOutput: output, // 添加原始輸出
+               buildPlan: {
+                 provider: parsedResult.language,
+                 startCmd: parsedResult.startCmd,
+                 packageManager: parsedResult.packageManager,
+                 framework: parsedResult.framework,
+                 version: parsedResult.version,
+                 installCmd: parsedResult.installCmd
+               }
+             }
+        
+        languageAnalysisResults.push({
+          language,
+          analysisResult
+        })
+        
+      } finally {
+        // 清理臨時目錄
+        try {
+          await fs.rm(tempDir, { recursive: true })
+        } catch (error) {
+          console.error(`清理臨時目錄失敗 (${language}):`, error)
+        }
+      }
+    }
+    
+    // 返回多語言分析結果
+    return {
+      language: 'multiple',
+      framework: 'none',
+      version: 'latest',
+      packageManager: 'none',
+      startCmd: 'echo "Multiple languages detected"',
+      installCmd: 'echo "Multiple languages detected"',
+      detectedLanguages,
+      languageAnalysisResults, // 包含每個語言的詳細分析結果
+      requiresSelection: false,
+      buildPlan: {
+        provider: 'multiple',
+        startCmd: 'echo "Multiple languages detected"',
+        packageManager: 'none',
+        framework: 'none',
+        version: 'latest',
+        installCmd: 'echo "Multiple languages detected"'
+      }
+    }
+  }
+  
   // 創建臨時目錄
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'zbpack-'))
   
@@ -58,14 +181,29 @@ async function analyzeWithZbpack(files: File[], selectedLanguage?: string): Prom
     // 調用 zbpack 分析
     const { stdout, stderr } = await execAsync(`zbpack --info "${tempDir}"`)
     
-    if (stderr) {
-      console.error('zbpack 錯誤:', stderr)
-    }
+    console.log('zbpack 標準輸出:', stdout)
+    console.log('zbpack 錯誤輸出:', stderr)
     
-    console.log('zbpack 輸出:', stdout)
+    // zbpack 的輸出可能在 stderr 中，所以我們需要檢查兩個輸出
+    const output = stdout || stderr || ''
     
-    // 解析 zbpack 輸出
-    const analysisResult = parseZbpackOutput(stdout)
+             // 解析 zbpack 輸出並返回原始輸出
+             const parsedResult = parseZbpackOutput(output)
+             const analysisResult = {
+               ...parsedResult,
+               detectedLanguages: detectedLanguages.length > 0 ? detectedLanguages : [parsedResult.language],
+               rawOutput: output, // 添加原始輸出
+               buildPlan: {
+                 provider: parsedResult.language,
+                 startCmd: parsedResult.startCmd,
+                 packageManager: parsedResult.packageManager,
+                 framework: parsedResult.framework,
+                 version: parsedResult.version,
+                 installCmd: parsedResult.installCmd
+               }
+             }
+    
+    console.log('分析完成 (原始輸出):', analysisResult)
     
     return analysisResult
     
@@ -92,52 +230,216 @@ function parseZbpackOutput(output: string): any {
   
   // 解析 zbpack 的表格輸出
   for (const line of lines) {
-    if (line.includes('│ provider')) {
+    console.log('檢查行:', line)
+    
+    // 檢查 provider 行
+    if (line.includes('│ provider') && line.includes('│')) {
       const match = line.match(/│\s*(\w+)\s*│/)
       if (match) {
         language = match[1]
+        console.log('找到語言:', language)
       }
-    } else if (line.includes('│ nodeVersion')) {
+    }
+    // 檢查 provider 行（另一種格式）
+    else if (line.includes('provider') && line.includes('│') && line.includes('python')) {
+      language = 'python'
+      console.log('找到語言 (格式2):', language)
+    }
+    // 檢查 provider 行（Node.js 格式）
+    else if (line.includes('provider') && line.includes('│') && line.includes('nodejs')) {
+      language = 'nodejs'
+      console.log('找到語言 (Node.js 格式):', language)
+    }
+    // 檢查 provider 行（Node.js 格式，另一種）
+    else if (line.includes('│ provider') && line.includes('│') && line.includes('nodejs')) {
+      language = 'nodejs'
+      console.log('找到語言 (Node.js 格式2):', language)
+    }
+    // 檢查 nodeVersion 行
+    else if (line.includes('│ nodeVersion') && line.includes('│')) {
       const match = line.match(/│\s*(\d+)\s*│/)
       if (match) {
         version = match[1]
+        console.log('找到 Node 版本:', version)
       }
-    } else if (line.includes('│ framework')) {
+    }
+    // 檢查 nodeVersion 行（另一種格式）
+    else if (line.includes('nodeVersion') && line.includes('│')) {
+      const match = line.match(/│\s*(\d+)\s*│/)
+      if (match) {
+        version = match[1]
+        console.log('找到 Node 版本 (格式2):', version)
+      }
+    }
+    // 檢查 pythonVersion 行
+    else if (line.includes('│ pythonVersion') && line.includes('│')) {
+      const match = line.match(/│\s*(\d+\.\d+)\s*│/)
+      if (match) {
+        version = match[1]
+        console.log('找到 Python 版本:', version)
+      }
+    }
+    // 檢查 pythonVersion 行（另一種格式）
+    else if (line.includes('pythonVersion') && line.includes('│') && line.includes('3.13')) {
+      version = '3.13'
+      console.log('找到 Python 版本 (格式2):', version)
+    }
+    // 檢查 framework 行
+    else if (line.includes('│ framework') && line.includes('│')) {
       const match = line.match(/│\s*(\w+)\s*│/)
       if (match && match[1] !== 'none') {
         framework = match[1]
+        console.log('找到框架:', framework)
       }
-    } else if (line.includes('│ packageManager')) {
+    }
+    // 檢查 framework 行（另一種格式）
+    else if (line.includes('framework') && line.includes('│') && line.includes('flask')) {
+      framework = 'flask'
+      console.log('找到框架 (格式2):', framework)
+    }
+    // 檢查 packageManager 行
+    else if (line.includes('│ packageManager') && line.includes('│')) {
       const match = line.match(/│\s*(\w+)\s*│/)
       if (match && match[1] !== 'unknown') {
         packageManager = match[1]
+        console.log('找到包管理器:', packageManager)
       }
-    } else if (line.includes('│ startCmd')) {
+    }
+    // 檢查 packageManager 行（另一種格式）
+    else if (line.includes('packageManager') && line.includes('│') && line.includes('pip')) {
+      packageManager = 'pip'
+      console.log('找到包管理器 (格式2):', packageManager)
+    }
+    // 檢查 packageManager 行（Node.js 格式）
+    else if (line.includes('packageManager') && line.includes('│') && line.includes('unknown')) {
+      packageManager = 'npm' // Node.js 默認使用 npm
+      console.log('找到包管理器 (Node.js 格式):', packageManager)
+    }
+    // 檢查 packageManager 行（Node.js 格式，另一種）
+    else if (line.includes('│ packageManager') && line.includes('│') && line.includes('unknown')) {
+      packageManager = 'npm' // Node.js 默認使用 npm
+      console.log('找到包管理器 (Node.js 格式2):', packageManager)
+    }
+    // 檢查 start 行
+    else if (line.includes('│ start') && line.includes('│')) {
       const match = line.match(/│\s*(.+?)\s*│/)
       if (match) {
         startCmd = match[1].trim()
+        console.log('找到啟動命令:', startCmd)
       }
-    } else if (line.includes('│ installCmd')) {
+    }
+    // 檢查 startCmd 行（Node.js 格式）
+    else if (line.includes('│ startCmd') && line.includes('│')) {
+      const match = line.match(/│\s*(.+?)\s*│/)
+      if (match) {
+        startCmd = match[1].trim()
+        console.log('找到啟動命令 (Node.js 格式):', startCmd)
+      }
+    }
+    // 檢查 startCmd 行（Node.js 格式，另一種）
+    else if (line.includes('startCmd') && line.includes('│') && line.includes('yarn')) {
+      startCmd = 'yarn start'
+      console.log('找到啟動命令 (Node.js yarn 格式):', startCmd)
+    }
+    // 檢查 startCmd 行（Node.js 格式，另一種）
+    else if (line.includes('│ startCmd') && line.includes('│') && line.includes('yarn')) {
+      startCmd = 'yarn start'
+      console.log('找到啟動命令 (Node.js yarn 格式2):', startCmd)
+    }
+    // 檢查 start 行（另一種格式）
+    else if (line.includes('start') && line.includes('│') && line.includes('_startup')) {
+      startCmd = '_startup() { gunicorn --bind :8080 app:app; }; _startup'
+      console.log('找到啟動命令 (格式2):', startCmd)
+    }
+    // 檢查 build 行
+    else if (line.includes('│ build') && line.includes('│')) {
       const match = line.match(/│\s*(.+?)\s*│/)
       if (match) {
         installCmd = match[1].trim()
+        console.log('找到構建命令:', installCmd)
       }
+    }
+    // 檢查 installCmd 行（Node.js 格式）
+    else if (line.includes('│ installCmd') && line.includes('│')) {
+      const match = line.match(/│\s*(.+?)\s*│/)
+      if (match) {
+        installCmd = match[1].trim()
+        console.log('找到安裝命令 (Node.js 格式):', installCmd)
+      }
+    }
+    // 檢查 installCmd 行（Node.js 格式，另一種）
+    else if (line.includes('installCmd') && line.includes('│') && line.includes('yarn')) {
+      installCmd = 'yarn install'
+      console.log('找到安裝命令 (Node.js yarn 格式):', installCmd)
+    }
+    // 檢查 installCmd 行（Node.js 格式，另一種）
+    else if (line.includes('│ installCmd') && line.includes('│') && line.includes('yarn')) {
+      installCmd = 'yarn install'
+      console.log('找到安裝命令 (Node.js yarn 格式2):', installCmd)
+    }
+    // 檢查 build 行（另一種格式）
+    else if (line.includes('build') && line.includes('│') && line.includes('pip install')) {
+      installCmd = 'pip install -r requirements.txt'
+      console.log('找到構建命令 (格式2):', installCmd)
+    }
+    // 檢查 install 行
+    else if (line.includes('│ install') && line.includes('│')) {
+      const match = line.match(/│\s*(.+?)\s*│/)
+      if (match) {
+        installCmd = match[1].trim()
+        console.log('找到安裝命令:', installCmd)
+      }
+    }
+    // 檢查 install 行（另一種格式）
+    else if (line.includes('install') && line.includes('│') && line.includes('pip install')) {
+      installCmd = 'pip install -r requirements.txt'
+      console.log('找到安裝命令 (格式2):', installCmd)
     }
   }
   
-  // 根據語言類型調整包管理器
+  // 根據語言類型調整包管理器和命令
   if (language === 'nodejs') {
-    if (packageManager === 'unknown') {
+    if (packageManager === 'unknown' || packageManager === 'none') {
       packageManager = 'npm'
+    }
+    if (startCmd === 'echo "No start command"') {
+      startCmd = 'npm start'
+    }
+    if (installCmd === 'echo "No install command"') {
+      installCmd = 'npm install'
     }
   } else if (language === 'python') {
     packageManager = 'pip'
+    if (startCmd === 'echo "No start command"') {
+      startCmd = 'python app.py'
+    }
+    if (installCmd === 'echo "No install command"') {
+      installCmd = 'pip install -r requirements.txt'
+    }
   } else if (language === 'go') {
     packageManager = 'go mod'
+    if (startCmd === 'echo "No start command"') {
+      startCmd = './main'
+    }
+    if (installCmd === 'echo "No install command"') {
+      installCmd = 'go mod download'
+    }
   } else if (language === 'java') {
     packageManager = 'maven'
+    if (startCmd === 'echo "No start command"') {
+      startCmd = 'java -jar target/app.jar'
+    }
+    if (installCmd === 'echo "No install command"') {
+      installCmd = 'mvn install'
+    }
   } else if (language === 'rust') {
     packageManager = 'cargo'
+    if (startCmd === 'echo "No start command"') {
+      startCmd = './target/release/app'
+    }
+    if (installCmd === 'echo "No install command"') {
+      installCmd = 'cargo build --release'
+    }
   }
   
   return {

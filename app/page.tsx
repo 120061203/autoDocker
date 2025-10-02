@@ -18,6 +18,7 @@ export default function Home() {
     setUploadedFiles(files)
     setAnalysisResult(null)
     setDockerfile('')
+    setShowMultiLanguageGenerator(false)
   }
 
   const handleAnalysisComplete = (result: any) => {
@@ -130,6 +131,17 @@ export default function Home() {
         {analysisResult && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-8">
             <h3 className="text-lg font-semibold mb-4">分析結果</h3>
+            
+            {/* 顯示原始 zbpack 輸出 */}
+            {analysisResult.rawOutput && (
+              <div className="mb-6">
+                <h4 className="text-md font-medium mb-3 text-gray-700">zbpack 原始輸出</h4>
+                <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto">
+                  <pre className="whitespace-pre-wrap">{analysisResult.rawOutput}</pre>
+                </div>
+              </div>
+            )}
+            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="text-sm text-gray-500">語言</div>
@@ -171,16 +183,17 @@ export default function Home() {
           </div>
         )}
 
-        {/* Multi-Language Dockerfile Generator */}
-        {showMultiLanguageGenerator && analysisResult?.detectedLanguages && analysisResult.detectedLanguages.length > 1 && (
-          <MultiLanguageDockerfileGenerator
-            detectedLanguages={analysisResult.detectedLanguages}
-            files={uploadedFiles}
-            onDockerfileGenerated={(language, dockerfile) => {
-              console.log(`Generated Dockerfile for ${language}`)
-            }}
-          />
-        )}
+               {/* Multi-Language Dockerfile Generator */}
+               {showMultiLanguageGenerator && analysisResult?.detectedLanguages && analysisResult.detectedLanguages.length > 1 && (
+                 <MultiLanguageDockerfileGenerator
+                   detectedLanguages={analysisResult.detectedLanguages}
+                   files={uploadedFiles}
+                   languageAnalysisResults={analysisResult.languageAnalysisResults}
+                   onDockerfileGenerated={(language, dockerfile) => {
+                     console.log(`Generated Dockerfile for ${language}`)
+                   }}
+                 />
+               )}
 
         {/* Dockerfile Preview */}
         {dockerfile && (

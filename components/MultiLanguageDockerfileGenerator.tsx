@@ -8,12 +8,17 @@ import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
 interface MultiLanguageDockerfileGeneratorProps {
   detectedLanguages: string[]
   files: File[]
+  languageAnalysisResults?: Array<{
+    language: string
+    analysisResult: any
+  }>
   onDockerfileGenerated: (language: string, dockerfile: string) => void
 }
 
 export default function MultiLanguageDockerfileGenerator({ 
   detectedLanguages, 
   files, 
+  languageAnalysisResults,
   onDockerfileGenerated 
 }: MultiLanguageDockerfileGeneratorProps) {
   const [generatedDockerfiles, setGeneratedDockerfiles] = useState<{ [key: string]: string }>({})
@@ -32,8 +37,22 @@ export default function MultiLanguageDockerfileGenerator({
 
   const generateDockerfileForLanguage = async (language: string) => {
     try {
-      // 創建該語言的分析結果
-      const mockAnalysisResult = createMockAnalysisResult(language)
+      // 優先使用詳細分析結果，如果沒有則使用模擬數據
+      let analysisResult
+      
+      if (languageAnalysisResults && languageAnalysisResults.length > 0) {
+        const languageResult = languageAnalysisResults.find(result => result.language === language)
+        if (languageResult) {
+          analysisResult = languageResult.analysisResult
+          console.log(`使用 ${language} 的詳細分析結果:`, analysisResult)
+        } else {
+          analysisResult = createMockAnalysisResult(language)
+          console.log(`未找到 ${language} 的詳細分析結果，使用模擬數據`)
+        }
+      } else {
+        analysisResult = createMockAnalysisResult(language)
+        console.log(`沒有詳細分析結果，使用模擬數據`)
+      }
       
       // 調用 Dockerfile 生成 API
       const response = await fetch('/api/generate-dockerfile', {
@@ -41,7 +60,7 @@ export default function MultiLanguageDockerfileGenerator({
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ analysisResult: mockAnalysisResult })
+        body: JSON.stringify({ analysisResult })
       })
 
       if (!response.ok) {
@@ -157,6 +176,21 @@ export default function MultiLanguageDockerfileGenerator({
                 <p className="text-sm text-gray-500">
                   {language} 專案 Dockerfile
                 </p>
+                
+                {/* 顯示原始 zbpack 輸出 */}
+                {languageAnalysisResults && languageAnalysisResults.length > 0 && (
+                  (() => {
+                    const languageResult = languageAnalysisResults.find(result => result.language === language)
+                    return languageResult?.analysisResult?.rawOutput ? (
+                      <div className="mt-3">
+                        <h5 className="text-sm font-medium text-gray-700 mb-2">zbpack 原始輸出</h5>
+                        <div className="bg-gray-900 text-green-400 p-3 rounded-lg font-mono text-xs overflow-x-auto">
+                          <pre className="whitespace-pre-wrap">{languageResult.analysisResult.rawOutput}</pre>
+                        </div>
+                      </div>
+                    ) : null
+                  })()
+                )}
               </div>
               <div className="flex items-center space-x-2">
                 {!generatedDockerfiles[language] ? (

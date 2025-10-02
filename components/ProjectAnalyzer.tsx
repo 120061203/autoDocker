@@ -52,6 +52,83 @@ export default function ProjectAnalyzer({
       console.log('分析結果:', result)
       onAnalysisComplete(result)
       
+      // 如果是多語言，則不自動生成 Dockerfile，交由 MultiLanguageDockerfileGenerator 處理
+      if (result.detectedLanguages && result.detectedLanguages.length > 1) {
+        return
+      }
+      
+      // 如果是多語言模式，也不生成 Dockerfile
+      if (result.language === 'multiple') {
+        return
+      }
+      
+      // 如果是原始輸出模式，仍然嘗試生成 Dockerfile
+      // 但需要先從原始輸出中提取語言信息
+      if (result.language === 'raw') {
+        // 嘗試從 rawOutput 中提取語言信息
+        const rawOutput = result.rawOutput || ''
+        let extractedLanguage = null
+        
+        // 更精確的語言檢測
+        if (rawOutput.includes('│ nodejs │') || rawOutput.includes('provider') && rawOutput.includes('nodejs')) {
+          extractedLanguage = 'nodejs'
+        } else if (rawOutput.includes('│ python │') || rawOutput.includes('provider') && rawOutput.includes('python')) {
+          extractedLanguage = 'python'
+        } else if (rawOutput.includes('│ go │') || rawOutput.includes('provider') && rawOutput.includes('go')) {
+          extractedLanguage = 'go'
+        } else if (rawOutput.includes('│ java │') || rawOutput.includes('provider') && rawOutput.includes('java')) {
+          extractedLanguage = 'java'
+        } else if (rawOutput.includes('│ rust │') || rawOutput.includes('provider') && rawOutput.includes('rust')) {
+          extractedLanguage = 'rust'
+        }
+        
+        // 如果還是沒檢測到，嘗試更寬鬆的匹配
+        if (!extractedLanguage) {
+          if (rawOutput.includes('nodejs')) {
+            extractedLanguage = 'nodejs'
+          } else if (rawOutput.includes('python')) {
+            extractedLanguage = 'python'
+          } else if (rawOutput.includes('go')) {
+            extractedLanguage = 'go'
+          } else if (rawOutput.includes('java')) {
+            extractedLanguage = 'java'
+          } else if (rawOutput.includes('rust')) {
+            extractedLanguage = 'rust'
+          }
+        }
+        
+        if (extractedLanguage) {
+          // 創建一個臨時的分析結果用於 Dockerfile 生成
+          const tempResult = {
+            ...result,
+            language: extractedLanguage,
+            framework: rawOutput.includes('framework') ? 'detected' : 'none',
+            version: rawOutput.includes('Version') ? 'latest' : 'latest',
+            packageManager: rawOutput.includes('packageManager') ? 'detected' : 'none',
+            startCmd: rawOutput.includes('startCmd') ? 'detected' : 'echo "No start command"',
+            installCmd: rawOutput.includes('installCmd') ? 'detected' : 'echo "No install command"'
+          }
+          
+          try {
+            const dockerfileResponse = await fetch('/api/generate-dockerfile', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ analysisResult: tempResult })
+            })
+
+            if (dockerfileResponse.ok) {
+              const { dockerfile } = await dockerfileResponse.json()
+              onDockerfileGenerated(dockerfile)
+            }
+          } catch (error) {
+            console.log('Dockerfile 生成失敗，但原始輸出仍會顯示:', error)
+          }
+        }
+        return
+      }
+      
       // 生成 Dockerfile
       const dockerfileResponse = await fetch('/api/generate-dockerfile', {
         method: 'POST',
