@@ -1,0 +1,19 @@
+{
+  "name": "example-nodejs-app",
+  "version": "1.0.0",
+  "description": "Example Node.js application for testing AutoDocker",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": ["nodejs", "express", "example"],
+  "author": "AutoDocker",
+  "license": "MIT"
+}
