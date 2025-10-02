@@ -1,0 +1,55 @@
+name: Deploy AutoDocker
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build application
+      run: npm run build
+      
+    - name: Setup Go for zbpack
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Install zbpack
+      run: |
+        git clone https://github.com/zeabur/zbpack.git /tmp/zbpack
+        cd /tmp/zbpack
+        go build -o zbpack ./cmd/zbpack
+        sudo mv zbpack /usr/local/bin/
+        zbpack --version
+        
+    - name: Deploy to Vercel
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.ORG_ID }}
+        vercel-project-id: ${{ secrets.PROJECT_ID }}
+        vercel-args: '--prod'
+        
+    - name: Deploy to Railway
+      if: github.ref == 'refs/heads/main'
+      uses: railwayapp/railway-deploy@v1
+      with:
+        railway-token: ${{ secrets.RAILWAY_TOKEN }}
+        service: autodocker

@@ -1,187 +1,267 @@
-# 部署指南
+# AutoDocker 部署指南
 
-## 部署到 Zeabur
+## 🚀 部署選項
 
-### 方法一：直接部署（推薦）
+AutoDocker 支援多種部署方式，您可以選擇最適合的平台：
 
-1. **準備專案**
-   ```bash
-   # 確保所有文件已提交
-   git add .
-   git commit -m "Initial commit"
-   git push origin main
+### 1. Vercel 部署 (推薦)
+
+**優點：** 零配置、自動擴展、全球 CDN、免費額度充足
+
+**設定步驟：**
+
+1. 在 [Vercel](https://vercel.com) 註冊帳號
+2. 連接 GitHub 倉庫
+3. 設定環境變數：
+   ```
+   VERCEL_TOKEN=your_vercel_token
+   ORG_ID=your_org_id
+   PROJECT_ID=your_project_id
    ```
 
-2. **在 Zeabur 部署**
-   - 訪問 [Zeabur Dashboard](https://dash.zeabur.com)
-   - 點擊 "New Project"
-   - 選擇 "Deploy from GitHub"
-   - 選擇你的倉庫
-   - 選擇 "Dockerfile" 部署方式
-   - 點擊 "Deploy"
+**部署命令：**
+```bash
+# 安裝 Vercel CLI
+npm i -g vercel
 
-3. **配置環境變量**（如需要）
-   - 在專案設置中添加必要的環境變量
-   - 例如：`NODE_ENV=production`
+# 部署
+vercel --prod
+```
 
-### 方法二：使用 Zeabur CLI
+### 2. Railway 部署
 
-1. **安裝 Zeabur CLI**
-   ```bash
-   npm install -g @zeabur/cli
+**優點：** 支援 Docker、簡單易用、自動部署
+
+**設定步驟：**
+
+1. 在 [Railway](https://railway.app) 註冊帳號
+2. 連接 GitHub 倉庫
+3. 設定環境變數：
+   ```
+   RAILWAY_TOKEN=your_railway_token
    ```
 
-2. **登入 Zeabur**
+**部署命令：**
+```bash
+# 安裝 Railway CLI
+npm install -g @railway/cli
+
+# 登入並部署
+railway login
+railway up
+```
+
+### 3. Docker 部署
+
+**優點：** 完全控制、可移植性、支援任何雲端平台
+
+**本地測試：**
+```bash
+# 建置映像
+docker build -t autodocker .
+
+# 運行容器
+docker run -p 3000:3000 autodocker
+```
+
+**使用 Docker Compose：**
+```bash
+# 啟動服務
+docker-compose up -d
+
+# 查看日誌
+docker-compose logs -f
+
+# 停止服務
+docker-compose down
+```
+
+### 4. 傳統 VPS 部署
+
+**適用於：** DigitalOcean、Linode、AWS EC2 等
+
+**部署步驟：**
+
+1. 準備伺服器 (Ubuntu 20.04+)
+2. 安裝必要軟體：
    ```bash
-   zeabur login
+   # 安裝 Node.js
+   curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+   sudo apt-get install -y nodejs
+
+   # 安裝 Go
+   wget https://go.dev/dl/go1.21.0.linux-amd64.tar.gz
+   sudo tar -C /usr/local -xzf go1.21.0.linux-amd64.tar.gz
+   echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+
+   # 安裝 zbpack
+   git clone https://github.com/zeabur/zbpack.git
+   cd zbpack
+   go build -o zbpack ./cmd/zbpack
+   sudo mv zbpack /usr/local/bin/
    ```
 
-3. **部署專案**
+3. 部署應用程式：
    ```bash
-   zeabur deploy
+   # 克隆倉庫
+   git clone https://github.com/120061203/autoDocker.git
+   cd autoDocker
+
+   # 安裝依賴
+   npm ci
+
+   # 建置應用程式
+   npm run build
+
+   # 使用 PM2 運行
+   npm install -g pm2
+   pm2 start npm --name "autodocker" -- start
+   pm2 save
+   pm2 startup
    ```
 
-## 部署到其他平台
+## 🔧 環境變數設定
 
-### Vercel
-
-1. **安裝 Vercel CLI**
-   ```bash
-   npm install -g vercel
-   ```
-
-2. **部署**
-   ```bash
-   vercel --prod
-   ```
-
-### Railway
-
-1. **連接 GitHub 倉庫**
-   - 訪問 [Railway](https://railway.app)
-   - 連接你的 GitHub 倉庫
-   - 選擇自動部署
-
-### Docker 本地部署
-
-1. **構建鏡像**
-   ```bash
-   docker build -t autodocker .
-   ```
-
-2. **運行容器**
-   ```bash
-   docker run -p 3000:3000 autodocker
-   ```
-
-## 環境配置
-
-### 必需環境變量
+### 必要環境變數
 
 ```bash
-# 生產環境
 NODE_ENV=production
 PORT=3000
 ```
 
-### 可選環境變量
+### 可選環境變數
 
 ```bash
-# 自定義配置
-NEXT_PUBLIC_APP_URL=https://your-domain.com
-NEXT_PUBLIC_API_URL=https://api.your-domain.com
+# 自訂 API 端點
+NEXT_PUBLIC_API_URL=https://your-domain.com
+
+# 快取設定
+CACHE_TTL=3600
+
+# 日誌等級
+LOG_LEVEL=info
 ```
 
-## 性能優化
+## 📊 監控和維護
 
-### 1. 啟用 Gzip 壓縮
-在 `next.config.js` 中添加：
-```javascript
-const nextConfig = {
-  compress: true,
-  // ... 其他配置
-}
+### 健康檢查
+
+所有部署方式都包含健康檢查端點：
+```
+GET /api/health
 ```
 
-### 2. 啟用 CDN
-- 在 Zeabur 中啟用 CDN 加速
-- 配置靜態資源緩存
+### 日誌監控
 
-### 3. 數據庫連接（如需要）
+**Vercel：** 在 Dashboard 查看函數日誌
+**Railway：** 在 Dashboard 查看部署日誌
+**Docker：** 使用 `docker logs` 查看日誌
+**VPS：** 使用 `pm2 logs` 查看日誌
+
+### 效能監控
+
+建議設定以下監控：
+- CPU 使用率
+- 記憶體使用率
+- 響應時間
+- 錯誤率
+
+## 🔄 自動部署
+
+### GitHub Actions
+
+當您推送代碼到 `main` 分支時，會自動觸發部署：
+
+1. **Vercel 部署：** 自動部署到 Vercel
+2. **Railway 部署：** 自動部署到 Railway
+3. **Docker 映像：** 自動建置並推送到 Docker Hub
+
+### 手動部署
+
 ```bash
-# 添加數據庫環境變量
-DATABASE_URL=your-database-url
+# 部署到 Vercel
+vercel --prod
+
+# 部署到 Railway
+railway up
+
+# 建置 Docker 映像
+docker build -t autodocker .
+docker push autodocker
 ```
 
-## 監控和日誌
-
-### 1. 健康檢查
-訪問 `/api/health` 端點檢查服務狀態
-
-### 2. 日誌監控
-- 在 Zeabur Dashboard 中查看實時日誌
-- 設置日誌告警
-
-### 3. 性能監控
-- 使用 Zeabur 內建的性能監控
-- 配置自定義指標
-
-## 故障排除
+## 🛠️ 故障排除
 
 ### 常見問題
 
-1. **構建失敗**
-   - 檢查 Node.js 版本兼容性
-   - 確保所有依賴已正確安裝
-
-2. **部署失敗**
-   - 檢查 Dockerfile 語法
-   - 確認端口配置正確
-
-3. **運行時錯誤**
-   - 檢查環境變量配置
-   - 查看應用日誌
-
-### 調試步驟
-
-1. **本地測試**
+1. **zbpack 未安裝**
    ```bash
-   npm run build
-   npm start
+   # 檢查 zbpack 是否安裝
+   zbpack --version
+   
+   # 如果未安裝，手動安裝
+   git clone https://github.com/zeabur/zbpack.git
+   cd zbpack && go build -o zbpack ./cmd/zbpack
+   sudo mv zbpack /usr/local/bin/
    ```
 
-2. **檢查構建日誌**
-   - 在 Zeabur Dashboard 中查看構建日誌
-   - 確認沒有錯誤信息
+2. **端口衝突**
+   ```bash
+   # 檢查端口使用情況
+   lsof -i :3000
+   
+   # 終止佔用端口的程序
+   kill -9 <PID>
+   ```
 
-3. **驗證部署**
-   - 訪問部署的 URL
-   - 測試主要功能
+3. **記憶體不足**
+   ```bash
+   # 增加 Node.js 記憶體限制
+   export NODE_OPTIONS="--max-old-space-size=4096"
+   ```
 
-## 安全配置
+### 日誌查看
 
-### 1. HTTPS
-- Zeabur 自動提供 HTTPS
-- 確保所有請求使用 HTTPS
+```bash
+# Docker 日誌
+docker logs <container_id>
 
-### 2. 環境變量安全
-- 不要在代碼中硬編碼敏感信息
-- 使用環境變量存儲配置
+# PM2 日誌
+pm2 logs autodocker
 
-### 3. 依賴安全
-- 定期更新依賴包
-- 使用 `npm audit` 檢查安全漏洞
+# 系統日誌
+journalctl -u your-service-name
+```
 
-## 擴展部署
+## 📈 效能優化
 
-### 1. 多環境部署
-- 設置開發、測試、生產環境
-- 使用不同的環境變量配置
+### 生產環境優化
 
-### 2. 自動化部署
-- 配置 GitHub Actions
-- 設置自動部署流程
+1. **啟用 gzip 壓縮**
+2. **設定適當的快取標頭**
+3. **使用 CDN 加速靜態資源**
+4. **監控和調整記憶體使用**
 
-### 3. 負載均衡
-- 使用 Zeabur 的負載均衡功能
-- 配置多實例部署
+### 擴展性考量
+
+- **水平擴展：** 使用負載均衡器
+- **垂直擴展：** 增加伺服器資源
+- **快取策略：** 實作 Redis 快取
+- **資料庫：** 考慮使用外部資料庫
+
+## 🔒 安全考量
+
+1. **環境變數：** 不要在代碼中硬編碼敏感資訊
+2. **HTTPS：** 確保所有通訊都使用 HTTPS
+3. **防火牆：** 設定適當的防火牆規則
+4. **定期更新：** 保持依賴套件最新
+5. **監控：** 設定安全監控和警報
+
+## 📞 支援
+
+如果您在部署過程中遇到問題，請：
+
+1. 檢查 [GitHub Issues](https://github.com/120061203/autoDocker/issues)
+2. 查看日誌輸出
+3. 確認環境變數設定
+4. 檢查網路連接和防火牆設定
