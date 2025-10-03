@@ -13,6 +13,128 @@ export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
   const [githubUrl, setGithubUrl] = useState('')
   const [downloadProgress, setDownloadProgress] = useState<string>('')
   const [isFileListExpanded, setIsFileListExpanded] = useState(false)
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+
+  // 構建文件樹結構
+  const buildFileTree = (files: File[]) => {
+    const tree: any = {}
+    
+    files.forEach((file, index) => {
+      const pathParts = file.name.split('/')
+      let current = tree
+      
+      pathParts.forEach((part, i) => {
+        if (i === pathParts.length - 1) {
+          // 這是文件
+          current[part] = { type: 'file', file, index }
+        } else {
+          // 這是目錄
+          if (!current[part]) {
+            current[part] = { type: 'folder', children: {} }
+          }
+          current = current[part].children
+        }
+      })
+    })
+    
+    return tree
+  }
+
+  // 渲染文件樹
+  const renderFileTree = (tree: any, level = 0, path = '') => {
+    const items: JSX.Element[] = []
+    
+    Object.entries(tree).forEach(([name, node]: [string, any]) => {
+      const currentPath = path ? `${path}/${name}` : name
+      const indent = '  '.repeat(level)
+      
+      if (node.type === 'folder') {
+        const isExpanded = expandedFolders.has(currentPath)
+        const hasChildren = Object.keys(node.children).length > 0
+        
+        items.push(
+          <div key={currentPath} className="select-none">
+            <div 
+              className="flex items-center space-x-1 py-1 hover:bg-gray-50 cursor-pointer"
+              onClick={() => {
+                const newExpanded = new Set(expandedFolders)
+                if (isExpanded) {
+                  newExpanded.delete(currentPath)
+                } else {
+                  newExpanded.add(currentPath)
+                }
+                setExpandedFolders(newExpanded)
+              }}
+            >
+              <span className="text-gray-500 font-mono text-xs">{indent}</span>
+              <div className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+              <svg className="h-4 w-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
+              </svg>
+              <span className="text-sm text-gray-700 font-medium">{name}</span>
+            </div>
+            {isExpanded && hasChildren && (
+              <div>
+                {renderFileTree(node.children, level + 1, currentPath)}
+              </div>
+            )}
+          </div>
+        )
+      } else {
+        // 文件
+        items.push(
+          <div key={currentPath} className="select-none">
+            <div className="flex items-center justify-between py-1 hover:bg-gray-50">
+              <div 
+                className="flex items-center space-x-1 flex-1 cursor-pointer"
+                onClick={() => viewFile(node.file)}
+                title="點擊查看文件內容"
+              >
+                <span className="text-gray-500 font-mono text-xs">{indent}</span>
+                <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                <File className="h-4 w-4 text-gray-500" />
+                <span className="text-sm text-gray-700 font-medium">{name}</span>
+                <span className="text-xs text-gray-500">
+                  ({(node.file.size / 1024).toFixed(1)} KB)
+                </span>
+                <span className="text-xs text-blue-500 hover:text-blue-700">
+                  點擊查看
+                </span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    downloadFile(node.file)
+                  }}
+                  className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 p-1 rounded transition-colors"
+                  title="下載文件"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => removeFile(node.index)}
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-colors"
+                  title="刪除文件"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    })
+    
+    return items
+  }
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newFiles = [...files, ...acceptedFiles]
@@ -309,47 +431,11 @@ export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
           </div>
           
           {isFileListExpanded && (
-            <div className="space-y-1 max-h-64 overflow-y-auto">
-              {files.map((file, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between bg-gray-50 rounded-md px-3 py-2 hover:bg-gray-100 transition-colors"
-                >
-                  <div 
-                    className="flex items-center space-x-2 flex-1 cursor-pointer"
-                    onClick={() => viewFile(file)}
-                    title="點擊查看文件內容"
-                  >
-                    <File className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm text-gray-700 font-medium">{file.name}</span>
-                    <span className="text-xs text-gray-500">
-                      ({(file.size / 1024).toFixed(1)} KB)
-                    </span>
-                    <span className="text-xs text-blue-500 hover:text-blue-700">
-                      點擊查看
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        downloadFile(file)
-                      }}
-                      className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 p-1 rounded transition-colors"
-                      title="下載文件"
-                    >
-                      <Download className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => removeFile(index)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-colors"
-                      title="刪除文件"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+            <div className="max-h-64 overflow-y-auto bg-gray-50 rounded-md p-2">
+              <div className="font-mono text-xs text-gray-600 mb-2">
+                📁 項目文件結構
+              </div>
+              {renderFileTree(buildFileTree(files))}
             </div>
           )}
         </div>
