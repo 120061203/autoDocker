@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('=== 開始分析請求 ===')
     console.log('收到分析請求')
     const formData = await request.formData()
     const files = formData.getAll('files') as File[]
@@ -9,9 +10,11 @@ export async function POST(request: NextRequest) {
 
     console.log('接收到的文件數量:', files.length)
     console.log('用戶選擇的語言:', selectedLanguage)
-    files.forEach(file => {
-      console.log('文件:', file.name, file.size, file.type)
-    })
+    
+    // 檢查文件
+    for (const file of files) {
+      console.log(`文件: ${file.name} ${file.size} ${file.type}`)
+    }
 
     if (!files || files.length === 0) {
       console.log('沒有提供文件')
@@ -72,6 +75,12 @@ async function analyzeWithZbpack(files: File[], selectedLanguage?: string): Prom
   }
   
   console.log('檢測到的語言:', detectedLanguages)
+  
+  // 如果沒有檢測到任何語言，使用默認
+  if (detectedLanguages.length === 0) {
+    console.log('沒有檢測到語言，使用默認 nodejs')
+    detectedLanguages.push('nodejs')
+  }
   
   // 如果檢測到多種語言，為每個語言分別分析
   if (detectedLanguages.length > 1) {
