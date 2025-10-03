@@ -96,9 +96,7 @@ export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
                 title="點擊查看文件內容"
               >
                 <span className="text-gray-500 font-mono text-xs">{indent}</span>
-                <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
+                <span className="w-3 h-3"></span> {/* 佔位符，保持對齊 */}
                 <File className="h-4 w-4 text-gray-500" />
                 <span className="text-sm text-gray-700 font-medium">{name}</span>
                 <span className="text-xs text-gray-500">
