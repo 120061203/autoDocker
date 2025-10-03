@@ -12,6 +12,7 @@ export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
   const [files, setFiles] = useState<File[]>([])
   const [githubUrl, setGithubUrl] = useState('')
   const [downloadProgress, setDownloadProgress] = useState<string>('')
+  const [isFileListExpanded, setIsFileListExpanded] = useState(false)
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newFiles = [...files, ...acceptedFiles]
@@ -287,7 +288,17 @@ export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
       {files.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium text-gray-700">已上傳的文件:</h4>
+            <button
+              onClick={() => setIsFileListExpanded(!isFileListExpanded)}
+              className="flex items-center space-x-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+            >
+              <span>已上傳的文件 ({files.length}):</span>
+              <div className={`transform transition-transform ${isFileListExpanded ? 'rotate-180' : ''}`}>
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </button>
             <button
               onClick={clearAllFiles}
               className="flex items-center space-x-1 px-3 py-1 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
@@ -296,48 +307,51 @@ export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
               <span>清除全部</span>
             </button>
           </div>
-          <div className="space-y-1">
-            {files.map((file, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between bg-gray-50 rounded-md px-3 py-2 hover:bg-gray-100 transition-colors"
-              >
-                <div 
-                  className="flex items-center space-x-2 flex-1 cursor-pointer"
-                  onClick={() => viewFile(file)}
-                  title="點擊查看文件內容"
+          
+          {isFileListExpanded && (
+            <div className="space-y-1 max-h-64 overflow-y-auto">
+              {files.map((file, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between bg-gray-50 rounded-md px-3 py-2 hover:bg-gray-100 transition-colors"
                 >
-                  <File className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-700 font-medium">{file.name}</span>
-                  <span className="text-xs text-gray-500">
-                    ({(file.size / 1024).toFixed(1)} KB)
-                  </span>
-                  <span className="text-xs text-blue-500 hover:text-blue-700">
-                    點擊查看
-                  </span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      downloadFile(file)
-                    }}
-                    className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 p-1 rounded transition-colors"
-                    title="下載文件"
+                  <div 
+                    className="flex items-center space-x-2 flex-1 cursor-pointer"
+                    onClick={() => viewFile(file)}
+                    title="點擊查看文件內容"
                   >
-                    <Download className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => removeFile(index)}
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-colors"
-                    title="刪除文件"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                    <File className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm text-gray-700 font-medium">{file.name}</span>
+                    <span className="text-xs text-gray-500">
+                      ({(file.size / 1024).toFixed(1)} KB)
+                    </span>
+                    <span className="text-xs text-blue-500 hover:text-blue-700">
+                      點擊查看
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        downloadFile(file)
+                      }}
+                      className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 p-1 rounded transition-colors"
+                      title="下載文件"
+                    >
+                      <Download className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => removeFile(index)}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-colors"
+                      title="刪除文件"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
