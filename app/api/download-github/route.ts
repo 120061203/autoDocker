@@ -18,12 +18,24 @@ export async function POST(request: NextRequest) {
     console.log('臨時目錄:', tempDir)
     
     try {
-      // 克隆 GitHub 倉庫
+      // 克隆 GitHub 倉庫到臨時子目錄
       console.log('正在克隆倉庫...')
-      await execAsync(`git clone --depth 1 ${githubUrl}.git "${tempDir}"`)
+      const cloneDir = path.join(tempDir, 'repo')
+      const cloneCommand = `git clone --depth 1 "${githubUrl}.git" "${cloneDir}"`
+      console.log('執行命令:', cloneCommand)
+      
+      const { stdout, stderr } = await execAsync(cloneCommand)
+      console.log('git clone 輸出:', stdout)
+      if (stderr) console.log('git clone 錯誤:', stderr)
+      
+      // 檢查克隆是否成功
+      const stats = await fs.stat(cloneDir)
+      if (!stats.isDirectory()) {
+        throw new Error('克隆失敗：目標目錄不存在')
+      }
       
       // 讀取倉庫中的關鍵文件
-      const files = await readProjectFiles(tempDir)
+      const files = await readProjectFiles(cloneDir)
       
       console.log(`成功下載 ${files.length} 個文件`)
       
