@@ -1,0 +1,24 @@
+{
+  "name": "autoDocker",
+  "description": "AutoDocker - 自動生成 Dockerfile 的應用程式",
+  "version": "1.0.0",
+  "type": "docker",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+  "environment": {
+    "NODE_ENV": "production",
+    "PORT": "3000"
+  },
+  "healthcheck": {
+    "path": "/api/health",
+    "interval": 30,
+    "timeout": 10,
+    "retries": 3
+  },
+  "resources": {
+    "memory": "512Mi",
+    "cpu": "0.5"
+  }
+}

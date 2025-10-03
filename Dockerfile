@@ -6,18 +6,18 @@ RUN apk add --no-cache \
     git \
     go \
     build-base \
+    wget \
+    curl \
     && rm -rf /var/cache/apk/*
 
 # 設定 Go 環境
 ENV GOPATH=/go
 ENV PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 
-# 安裝 zbpack
-RUN git clone https://github.com/zeabur/zbpack.git /tmp/zbpack && \
-    cd /tmp/zbpack && \
-    go build -o zbpack ./cmd/zbpack && \
-    mv zbpack /usr/local/bin/ && \
-    rm -rf /tmp/zbpack
+# 安裝 zbpack (使用官方版本以確保兼容性)
+RUN wget -O /usr/local/bin/zbpack https://github.com/zbpack/zbpack/releases/latest/download/zbpack_linux_amd64 \
+    && chmod +x /usr/local/bin/zbpack \
+    && zbpack --version
 
 # 建立應用程式目錄
 WORKDIR /app
