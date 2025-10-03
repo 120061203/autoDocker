@@ -339,7 +339,11 @@ async function analyzeWithZbpack(files: File[], selectedLanguage?: string): Prom
 function parseZbpackOutput(output: string): any {
   console.log('解析 zbpack 輸出:', output)
   
-  const lines = output.split('\n')
+  // 清理 ANSI 顏色代碼
+  const cleanOutput = output.replace(/\x1b\[[0-9;]*m/g, '')
+  console.log('清理後的輸出:', cleanOutput)
+  
+  const lines = cleanOutput.split('\n')
   let language = 'unknown'
   let framework = 'none'
   let version = 'latest'
