@@ -122,7 +122,36 @@ async function analyzeWithZbpack(files: File[], selectedLanguage?: string): Prom
           }
         } catch (error) {
           console.error(`zbpack 執行失敗 (${language}):`, error)
-          throw new Error(`zbpack 執行失敗: ${error.message}`)
+          // 不要拋出錯誤，而是返回一個基本的分析結果
+          const fallbackResult = {
+            language: language,
+            framework: 'none',
+            version: 'latest',
+            packageManager: 'unknown',
+            startCmd: 'echo "zbpack failed"',
+            installCmd: 'echo "zbpack failed"'
+          }
+          
+          const analysisResult = {
+            ...fallbackResult,
+            detectedLanguages: [language],
+            rawOutput: `zbpack 執行失敗: ${error.message}`,
+            buildPlan: {
+              provider: language,
+              startCmd: fallbackResult.startCmd,
+              packageManager: fallbackResult.packageManager,
+              framework: fallbackResult.framework,
+              version: fallbackResult.version,
+              installCmd: fallbackResult.installCmd
+            }
+          }
+          
+          languageAnalysisResults.push({
+            language,
+            analysisResult
+          })
+          
+          continue // 繼續處理下一個語言
         }
         
              // 解析 zbpack 輸出並返回原始輸出
@@ -204,13 +233,44 @@ async function analyzeWithZbpack(files: File[], selectedLanguage?: string): Prom
     console.log('調用 zbpack 分析:', tempDir)
     
     // 調用 zbpack 分析
-    const { stdout, stderr } = await execAsync(`zbpack --info "${tempDir}"`)
-    
-    console.log('zbpack 標準輸出:', stdout)
-    console.log('zbpack 錯誤輸出:', stderr)
-    
-    // zbpack 的輸出可能在 stderr 中，所以我們需要檢查兩個輸出
-    const output = stdout || stderr || ''
+    let output = ''
+    try {
+      const { stdout, stderr } = await execAsync(`zbpack --info "${tempDir}"`)
+      
+      console.log('zbpack 標準輸出:', stdout)
+      console.log('zbpack 錯誤輸出:', stderr)
+      
+      // zbpack 的輸出可能在 stderr 中，所以我們需要檢查兩個輸出
+      output = stdout || stderr || ''
+    } catch (error) {
+      console.error('zbpack 執行失敗:', error)
+      // 如果 zbpack 失敗，返回基本分析結果
+      const fallbackResult = {
+        language: detectedLanguages.length > 0 ? detectedLanguages[0] : 'nodejs',
+        framework: 'none',
+        version: 'latest',
+        packageManager: 'unknown',
+        startCmd: 'echo "zbpack failed"',
+        installCmd: 'echo "zbpack failed"'
+      }
+      
+      const analysisResult = {
+        ...fallbackResult,
+        detectedLanguages: detectedLanguages.length > 0 ? detectedLanguages : [fallbackResult.language],
+        rawOutput: `zbpack 執行失敗: ${error.message}`,
+        buildPlan: {
+          provider: fallbackResult.language,
+          startCmd: fallbackResult.startCmd,
+          packageManager: fallbackResult.packageManager,
+          framework: fallbackResult.framework,
+          version: fallbackResult.version,
+          installCmd: fallbackResult.installCmd
+        }
+      }
+      
+      console.log('分析完成 (備用結果):', analysisResult)
+      return analysisResult
+    }
     
              // 解析 zbpack 輸出並返回原始輸出
              const parsedResult = parseZbpackOutput(output)
