@@ -54,62 +54,50 @@ export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
         
         const [, owner, repo] = urlMatch
         
-        // 調用 GitHub API 獲取倉庫信息
-        const response = await fetch(`https://api.github.com/repos/${owner}/${repo}`)
+        // 顯示下載進度
+        alert('正在下載 GitHub 倉庫文件，請稍候...')
+        
+        // 調用後端 API 下載 GitHub 倉庫
+        const response = await fetch('/api/download-github', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            owner,
+            repo,
+            githubUrl
+          })
+        })
+        
         if (!response.ok) {
-          alert('無法訪問該 GitHub 倉庫，請檢查連結是否正確')
-          return
+          const errorData = await response.json()
+          throw new Error(errorData.error || '下載失敗')
         }
         
-        const repoData = await response.json()
-        console.log('GitHub 倉庫信息:', repoData)
+        const result = await response.json()
+        console.log('GitHub 下載結果:', result)
         
-        // 創建模擬文件對象（基於倉庫信息）
-        const mockFiles: File[] = []
+        // 將下載的文件轉換為 File 對象
+        const downloadedFiles: File[] = []
         
-        // 根據倉庫的主要語言創建對應的文件
-        if (repoData.language === 'JavaScript' || repoData.language === 'TypeScript') {
-          const packageJsonContent = '{"name": "github-repo", "version": "1.0.0", "dependencies": {"express": "^4.18.0"}}'
-          const indexJsContent = 'const express = require("express");\nconst app = express();\napp.get("/", (req, res) => res.json({message: "Hello from GitHub!"}));\napp.listen(3000);'
-          
-          // 創建 Blob 然後轉換為 File
-          const packageJsonBlob = new Blob([packageJsonContent], { type: 'application/json' })
-          const indexJsBlob = new Blob([indexJsContent], { type: 'text/javascript' })
-          
-          mockFiles.push(
-            Object.assign(packageJsonBlob, { name: 'package.json' }) as File,
-            Object.assign(indexJsBlob, { name: 'index.js' }) as File
-          )
-        } else if (repoData.language === 'Python') {
-          const requirementsContent = 'flask==2.3.3\ngunicorn==21.2.0'
-          const appPyContent = 'from flask import Flask\napp = Flask(__name__)\n@app.route("/")\ndef hello():\n    return "Hello from GitHub!"\nif __name__ == "__main__":\n    app.run()'
-          
-          // 創建 Blob 然後轉換為 File
-          const requirementsBlob = new Blob([requirementsContent], { type: 'text/plain' })
-          const appPyBlob = new Blob([appPyContent], { type: 'text/x-python-script' })
-          
-          mockFiles.push(
-            Object.assign(requirementsBlob, { name: 'requirements.txt' }) as File,
-            Object.assign(appPyBlob, { name: 'app.py' }) as File
-          )
-        } else {
-          // 默認創建一個通用文件
-          const readmeContent = '# GitHub Repository\n# Language: ' + repoData.language
-          const readmeBlob = new Blob([readmeContent], { type: 'text/markdown' })
-          
-          mockFiles.push(
-            Object.assign(readmeBlob, { name: 'README.md' }) as File
-          )
+        for (const file of result.files) {
+          const blob = new Blob([file.content], { type: file.type })
+          const fileObj = Object.assign(blob, { 
+            name: file.name,
+            lastModified: Date.now()
+          }) as File
+          downloadedFiles.push(fileObj)
         }
         
-        setFiles(mockFiles)
-        onFilesUploaded(mockFiles)
+        setFiles(downloadedFiles)
+        onFilesUploaded(downloadedFiles)
         
-        alert(`成功從 GitHub 獲取倉庫信息：${repoData.full_name}\n主要語言：${repoData.language}`)
+        alert(`成功下載 ${downloadedFiles.length} 個文件：${result.files.map(f => f.name).join(', ')}`)
         
       } catch (error) {
         console.error('GitHub URL 處理失敗:', error)
-        alert('GitHub 連結處理失敗，請檢查網路連接或稍後再試')
+        alert(`GitHub 連結處理失敗：${error.message}`)
       }
     }
   }
