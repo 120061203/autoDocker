@@ -9,19 +9,24 @@ const execAsync = promisify(exec)
 
 export async function POST(request: NextRequest) {
   try {
-    const { owner, repo, githubUrl } = await request.json()
+    const { owner, repo, githubUrl, branch = 'main' } = await request.json()
     
-    console.log('開始下載 GitHub 倉庫:', { owner, repo, githubUrl })
+    console.log('開始下載 GitHub 倉庫:', { owner, repo, githubUrl, branch })
     
-    // 創建臨時目錄
-    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'github-download-'))
-    console.log('臨時目錄:', tempDir)
+    // 創建特定格式的目錄名稱
+    const now = new Date()
+    const timestamp = now.toISOString().replace(/[-:T.]/g, '').slice(0, 14) // YYYYMMDDHHMMSS
+    const projectDir = `${owner}_${repo}_${branch}_${timestamp}`
+    
+    // 創建項目目錄
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), projectDir + '-'))
+    console.log('項目目錄:', tempDir)
     
     try {
       // 克隆 GitHub 倉庫到臨時子目錄
       console.log('正在克隆倉庫...')
       const cloneDir = path.join(tempDir, 'repo')
-      const cloneCommand = `git clone --depth 1 "${githubUrl}.git" "${cloneDir}"`
+      const cloneCommand = `git clone --depth 1 --branch ${branch} "${githubUrl}.git" "${cloneDir}"`
       console.log('執行命令:', cloneCommand)
       
       const { stdout, stderr } = await execAsync(cloneCommand)
@@ -39,15 +44,26 @@ export async function POST(request: NextRequest) {
       
       console.log(`成功下載 ${files.length} 個文件`)
       
+      // 返回文件列表和項目信息
+      const response = NextResponse.json({
+        success: true,
+        files,
+        projectInfo: {
+          owner,
+          repo,
+          branch,
+          timestamp,
+          projectDir,
+          downloadPath: tempDir
+        },
+        message: `成功下載 ${files.length} 個文件到 ${projectDir}`
+      })
+      
       // 清理臨時目錄
       await fs.rm(tempDir, { recursive: true })
       console.log('已清理臨時目錄')
       
-      return NextResponse.json({
-        success: true,
-        files,
-        message: `成功下載 ${files.length} 個文件`
-      })
+      return response
       
     } catch (error) {
       // 確保清理臨時目錄

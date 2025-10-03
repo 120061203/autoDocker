@@ -203,7 +203,12 @@ export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
         setFiles(downloadedFiles)
         onFilesUploaded(downloadedFiles)
         
-        alert(`成功下載 ${downloadedFiles.length} 個文件：${result.files.map(f => f.name).join(', ')}`)
+        // 顯示項目信息
+        const projectInfo = result.projectInfo
+        const projectDir = projectInfo?.projectDir || '未知'
+        const branch = projectInfo?.branch || 'main'
+        
+        alert(`成功下載 ${downloadedFiles.length} 個文件到項目目錄：${projectDir}\n分支：${branch}\n文件：${result.files.map(f => f.name).join(', ')}`)
         
       } catch (error) {
         console.error('GitHub URL 處理失敗:', error)
