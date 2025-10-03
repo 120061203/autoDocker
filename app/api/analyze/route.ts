@@ -168,7 +168,8 @@ async function analyzeWithZbpack(files: File[], selectedLanguage?: string): Prom
              
              // 如果 zbpack 輸出為空，拋出錯誤
              if (!output || output.trim() === '') {
-               throw new Error(`zbpack 輸出為空，無法分析 ${language} 項目`)
+               console.log(`zbpack 輸出為空，跳過 ${language} 語言分析`)
+               continue // 跳過這個語言，繼續處理下一個
              }
              
              // 如果解析結果的語言與預期不符，使用預期的語言
@@ -204,6 +205,11 @@ async function analyzeWithZbpack(files: File[], selectedLanguage?: string): Prom
           console.error(`清理臨時目錄失敗 (${language}):`, error)
         }
       }
+    }
+    
+    // 檢查是否有任何成功的分析結果
+    if (languageAnalysisResults.length === 0) {
+      throw new Error(`所有語言的 zbpack 分析都失敗了`)
     }
     
     // 返回多語言分析結果
@@ -283,6 +289,11 @@ async function analyzeWithZbpack(files: File[], selectedLanguage?: string): Prom
     
              // 解析 zbpack 輸出並返回原始輸出
              const parsedResult = parseZbpackOutput(output)
+             
+             // 如果 zbpack 輸出為空，拋出錯誤
+             if (!output || output.trim() === '') {
+               throw new Error(`zbpack 輸出為空，無法分析項目`)
+             }
              
              // 如果解析失敗或語言未知，使用檢測到的語言
              let finalLanguage = parsedResult.language
