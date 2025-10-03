@@ -97,16 +97,41 @@ async function analyzeWithZbpack(files: File[], selectedLanguage?: string): Prom
         console.log(`調用 zbpack 分析 ${language}:`, tempDir)
         
         // 調用 zbpack 分析
-        const { stdout, stderr } = await execAsync(`zbpack --info "${tempDir}"`)
-        
-        console.log(`zbpack 標準輸出 (${language}):`, stdout)
-        console.log(`zbpack 錯誤輸出 (${language}):`, stderr)
-        
-        // zbpack 的輸出可能在 stderr 中
-        const output = stdout || stderr || ''
+        let output = ''
+        try {
+          console.log(`執行 zbpack --info "${tempDir}"`)
+          const { stdout, stderr } = await execAsync(`zbpack --info "${tempDir}"`)
+          
+          console.log(`zbpack 標準輸出 (${language}):`, JSON.stringify(stdout))
+          console.log(`zbpack 錯誤輸出 (${language}):`, JSON.stringify(stderr))
+          
+          // zbpack 的輸出可能在 stderr 中
+          output = stdout || stderr || ''
+          
+          // 如果輸出為空，嘗試其他命令
+          if (!output || output.trim() === '') {
+            console.log('zbpack 輸出為空，嘗試其他命令...')
+            try {
+              console.log(`執行 zbpack "${tempDir}"`)
+              const { stdout: stdout2, stderr: stderr2 } = await execAsync(`zbpack "${tempDir}"`)
+              output = stdout2 || stderr2 || ''
+              console.log('zbpack 備用命令輸出:', JSON.stringify(output))
+            } catch (error2) {
+              console.log('zbpack 備用命令也失敗:', error2)
+            }
+          }
+        } catch (error) {
+          console.error(`zbpack 執行失敗 (${language}):`, error)
+          throw new Error(`zbpack 執行失敗: ${error.message}`)
+        }
         
              // 解析 zbpack 輸出並返回原始輸出
-             const parsedResult = parseZbpackOutput(output)
+             let parsedResult = parseZbpackOutput(output)
+             
+             // 如果 zbpack 輸出為空，拋出錯誤
+             if (!output || output.trim() === '') {
+               throw new Error(`zbpack 輸出為空，無法分析 ${language} 項目`)
+             }
              
              // 如果解析結果的語言與預期不符，使用預期的語言
              if (parsedResult.language !== language && language !== 'unknown') {
@@ -189,12 +214,25 @@ async function analyzeWithZbpack(files: File[], selectedLanguage?: string): Prom
     
              // 解析 zbpack 輸出並返回原始輸出
              const parsedResult = parseZbpackOutput(output)
+             
+             // 如果解析失敗或語言未知，使用檢測到的語言
+             let finalLanguage = parsedResult.language
+             if (finalLanguage === 'unknown' || finalLanguage === 'raw' || !finalLanguage) {
+               if (detectedLanguages.length > 0) {
+                 finalLanguage = detectedLanguages[0]
+                 console.log(`語言推斷: ${parsedResult.language} -> ${finalLanguage}`)
+               } else {
+                 throw new Error(`無法從 zbpack 輸出中識別語言類型`)
+               }
+             }
+             
              const analysisResult = {
                ...parsedResult,
-               detectedLanguages: detectedLanguages.length > 0 ? detectedLanguages : [parsedResult.language],
+               language: finalLanguage, // 使用推斷的語言
+               detectedLanguages: detectedLanguages.length > 0 ? detectedLanguages : [finalLanguage],
                rawOutput: output, // 添加原始輸出
                buildPlan: {
-                 provider: parsedResult.language,
+                 provider: finalLanguage,
                  startCmd: parsedResult.startCmd,
                  packageManager: parsedResult.packageManager,
                  framework: parsedResult.framework,
@@ -216,6 +254,7 @@ async function analyzeWithZbpack(files: File[], selectedLanguage?: string): Prom
     }
   }
 }
+
 
 function parseZbpackOutput(output: string): any {
   console.log('解析 zbpack 輸出:', output)

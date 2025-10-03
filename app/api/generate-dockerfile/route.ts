@@ -21,7 +21,42 @@ export async function POST(request: NextRequest) {
 }
 
 function generateDockerfile(analysis: any): string {
-  const { language, framework, version, startCmd, installCmd } = analysis
+  const { language, framework, version, startCmd, installCmd, detectedLanguages, languageAnalysisResults } = analysis
+  
+  // 處理多語言項目
+  if (language === 'multiple' && detectedLanguages && detectedLanguages.length > 0) {
+    // 選擇第一個檢測到的語言作為主要語言
+    const primaryLanguage = detectedLanguages[0]
+    console.log(`多語言項目，選擇主要語言: ${primaryLanguage}`)
+    
+    // 如果有詳細的分析結果，使用第一個語言的結果
+    if (languageAnalysisResults && languageAnalysisResults.length > 0) {
+      const primaryAnalysis = languageAnalysisResults[0].analysisResult
+      return generateDockerfileByLanguage(primaryLanguage, primaryAnalysis)
+    }
+    
+    // 否則使用默認配置
+    return generateDockerfileByLanguage(primaryLanguage, { framework, version, startCmd, installCmd })
+  }
+  
+  // 處理原始輸出
+  if (language === 'raw') {
+    // 嘗試從檢測到的語言中推斷
+    if (detectedLanguages && detectedLanguages.length > 0) {
+      const primaryLanguage = detectedLanguages[0]
+      console.log(`原始輸出，推斷語言: ${primaryLanguage}`)
+      return generateDockerfileByLanguage(primaryLanguage, { framework, version, startCmd, installCmd })
+    }
+    
+    // 如果無法推斷，拋出錯誤
+    throw new Error(`無法推斷語言類型，檢測到的語言: ${detectedLanguages?.join(', ') || '無'}`)
+  }
+  
+  return generateDockerfileByLanguage(language, { framework, version, startCmd, installCmd })
+}
+
+function generateDockerfileByLanguage(language: string, analysis: any): string {
+  const { framework, version, startCmd, installCmd } = analysis
   
   switch (language) {
     case 'nodejs':
@@ -294,4 +329,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
 # Start command
 CMD ["./app"]`
 }
+
 
