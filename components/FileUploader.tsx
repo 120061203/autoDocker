@@ -11,6 +11,7 @@ interface FileUploaderProps {
 export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
   const [files, setFiles] = useState<File[]>([])
   const [githubUrl, setGithubUrl] = useState('')
+  const [downloadProgress, setDownloadProgress] = useState<string>('')
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newFiles = [...files, ...acceptedFiles]
@@ -165,7 +166,7 @@ export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
         const [, owner, repo] = urlMatch
         
         // 顯示下載進度
-        alert('正在下載 GitHub 倉庫文件，請稍候...')
+        setDownloadProgress('🔄 正在下載 GitHub 倉庫...')
         
         // 調用後端 API 下載 GitHub 倉庫
         const response = await fetch('/api/download-github', {
@@ -188,6 +189,8 @@ export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
         const result = await response.json()
         console.log('GitHub 下載結果:', result)
         
+        setDownloadProgress('📁 正在讀取文件...')
+        
         // 將下載的文件轉換為 File 對象
         const downloadedFiles: File[] = []
         
@@ -203,15 +206,23 @@ export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
         setFiles(downloadedFiles)
         onFilesUploaded(downloadedFiles)
         
-        // 顯示項目信息
+        // 顯示項目信息（命令行風格）
         const projectInfo = result.projectInfo
         const projectDir = projectInfo?.projectDir || '未知'
         const branch = projectInfo?.branch || 'main'
         
-        alert(`成功下載 ${downloadedFiles.length} 個文件到項目目錄：${projectDir}\n分支：${branch}\n文件：${result.files.map(f => f.name).join(', ')}`)
+        setDownloadProgress(`✅ 成功下載 ${downloadedFiles.length} 個文件到 ${projectDir}`)
+        console.log(`✅ 成功下載 ${downloadedFiles.length} 個文件`)
+        console.log(`📁 項目目錄: ${projectDir}`)
+        console.log(`🌿 分支: ${branch}`)
+        console.log(`📄 文件列表: ${result.files.map(f => f.name).join(', ')}`)
+        
+        // 3秒後清除進度信息
+        setTimeout(() => setDownloadProgress(''), 3000)
         
       } catch (error) {
         console.error('GitHub URL 處理失敗:', error)
+        setDownloadProgress('❌ GitHub 連結處理失敗')
         alert(`GitHub 連結處理失敗：${error.message}`)
       }
     }
@@ -239,6 +250,16 @@ export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
           支援整個專案文件夾，包含 package.json, requirements.txt, go.mod 等配置文件
         </p>
       </div>
+
+      {/* Download Progress */}
+      {downloadProgress && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="flex items-center space-x-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+            <span className="text-sm text-blue-800 font-mono">{downloadProgress}</span>
+          </div>
+        </div>
+      )}
 
       {/* GitHub URL Input */}
       <div className="border-t pt-4">

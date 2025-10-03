@@ -134,49 +134,8 @@ async function readProjectFiles(dir: string): Promise<any[]> {
     }
   }
   
-  // 讀取根目錄下的所有文件（除了 .git 目錄）
-  console.log('讀取根目錄所有文件')
-  try {
-    const entries = await fs.readdir(dir, { withFileTypes: true })
-    
-    for (const entry of entries) {
-      if (entry.isFile() && !entry.name.startsWith('.') && entry.name !== 'README.md') {
-        try {
-          const filePath = path.join(dir, entry.name)
-          const content = await fs.readFile(filePath, 'utf-8')
-          const fileType = getFileType(entry.name)
-          
-          files.push({
-            name: entry.name,
-            content,
-            type: fileType,
-            size: content.length
-          })
-          
-          console.log(`讀取文件: ${entry.name} (${content.length} bytes)`)
-        } catch (error) {
-          console.log(`無法讀取文件: ${entry.name}`)
-        }
-      }
-    }
-    
-    // 也讀取一些常見的源代碼文件
-    const sourceFiles = ['src', 'app', 'lib', 'components', 'pages', 'routes']
-    for (const sourceDir of sourceFiles) {
-      try {
-        const sourcePath = path.join(dir, sourceDir)
-        const stats = await fs.stat(sourcePath)
-        if (stats.isDirectory()) {
-          console.log(`讀取源代碼目錄: ${sourceDir}`)
-          await readDirectoryRecursively(sourcePath, sourceDir, files)
-        }
-      } catch (error) {
-        // 目錄不存在，跳過
-      }
-    }
-  } catch (error) {
-    console.error('讀取目錄失敗:', error)
-  }
+  // 遞歸讀取整個項目目錄，保持文件結構
+  await readDirectoryRecursively(dir, '', files)
   
   return files
 }
@@ -203,15 +162,13 @@ async function readDirectoryRecursively(dir: string, basePath: string, files: an
             type: fileType,
             size: content.length
           })
-          
-          console.log(`讀取文件: ${relativePath} (${content.length} bytes)`)
         } catch (error) {
-          console.log(`無法讀取文件: ${relativePath}`)
+          // 靜默跳過無法讀取的文件
         }
       }
     }
   } catch (error) {
-    console.error(`讀取目錄失敗: ${dir}`, error)
+    // 靜默跳過無法讀取的目錄
   }
 }
 
