@@ -290,6 +290,8 @@ export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
         setDownloadProgress('🔄 正在下載 GitHub 倉庫...')
         
         // 調用後端 API 下載 GitHub 倉庫
+        console.log('發送請求到 /api/download-github', { owner, repo, githubUrl })
+        
         const response = await fetch('/api/download-github', {
           method: 'POST',
           headers: {
@@ -302,9 +304,12 @@ export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
           })
         })
         
+        console.log('API 響應狀態:', response.status, response.statusText)
+        
         if (!response.ok) {
           const errorData = await response.json()
-          throw new Error(errorData.error || '下載失敗')
+          console.error('API 錯誤響應:', errorData)
+          throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
         }
         
         const result = await response.json()
@@ -336,15 +341,23 @@ export default function FileUploader({ onFilesUploaded }: FileUploaderProps) {
         console.log(`✅ 成功下載 ${downloadedFiles.length} 個文件`)
         console.log(`📁 項目目錄: ${projectDir}`)
         console.log(`🌿 分支: ${branch}`)
-        console.log(`📄 文件列表: ${result.files.map(f => f.name).join(', ')}`)
+        console.log(`📄 文件列表: ${result.files.map((f: any) => f.name).join(', ')}`)
         
         // 3秒後清除進度信息
         setTimeout(() => setDownloadProgress(''), 3000)
         
       } catch (error) {
         console.error('GitHub URL 處理失敗:', error)
+        console.error('錯誤詳情:', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined,
+          name: error instanceof Error ? error.name : undefined
+        })
         setDownloadProgress('❌ GitHub 連結處理失敗')
-        alert(`GitHub 連結處理失敗：${error.message}`)
+        
+        // 顯示更詳細的錯誤信息
+        const errorMessage = error instanceof Error ? error.message : '未知錯誤'
+        alert(`GitHub 連結處理失敗：${errorMessage}\n\n請檢查：\n1. GitHub URL 是否正確\n2. 倉庫是否為公開倉庫\n3. 網絡連接是否正常`)
       }
     }
   }

@@ -77,10 +77,28 @@ export async function POST(request: NextRequest) {
     
   } catch (error) {
     console.error('GitHub 下載失敗:', error)
+    console.error('錯誤詳情:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined
+    })
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const isNetworkError = errorMessage.includes('ENOTFOUND') || errorMessage.includes('ECONNREFUSED')
+    const isGitError = errorMessage.includes('git clone') || errorMessage.includes('fatal:')
+    
+    let userMessage = 'GitHub 下載失敗'
+    if (isNetworkError) {
+      userMessage = '網絡連接失敗，請檢查網絡連接'
+    } else if (isGitError) {
+      userMessage = 'Git 克隆失敗，請檢查倉庫 URL 是否正確'
+    }
+    
     return NextResponse.json(
       { 
-        error: 'GitHub 下載失敗', 
-        details: error instanceof Error ? error.message : 'Unknown error' 
+        error: userMessage, 
+        details: errorMessage,
+        type: isNetworkError ? 'network' : isGitError ? 'git' : 'unknown'
       },
       { status: 500 }
     )
